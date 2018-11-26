@@ -1,0 +1,269 @@
+<!doctype html>
+
+<html lang="en-US">
+<head>
+  <title>Bed-n-Blockchain</title>
+  <meta charset="utf-8"/>
+
+  <link rel="stylesheet" href="bnb.css">
+  <script type="text/javascript" src="pageBeautify.js"></script>
+
+  <script src="./web3/dist/web3.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/truffle-contract@3.0.6/dist/truffle-contract.js"></script>
+
+
+  <script>
+    let web3Provider;
+    if (typeof web3 !== 'undefined') {
+      // this will work if a web3 instance has been injected
+      // such is the case with Metamask
+      web3Provider = web3.currentProvider;
+    }
+    else {
+      // but for our purpose we'll connect to truffle
+      web3Provider = new Web3.providers.HttpProvider('http://127.0.0.1:7545/');
+    }
+    window.web3 = new Web3(web3Provider);
+
+
+    let propertyContract;
+    let propertyRegistryContract;
+    let propertyTokenContract;
+    let checkin;
+    let checkout;
+
+    async function getContract(json, address, web3 = window.web3) {
+      const contract = TruffleContract(json);
+      contract.setProvider(web3.currentProvider);
+      console.log(contract);
+      return address ? contract.at(address) : contract.deployed();
+    }
+
+
+    async function PropertyInit() {
+      const json = await fetch('./contracts/Property.json').then((res) => {return res.json()});
+      propertyContract = await getContract(json);
+      // const event = propertyContract.allEvents({ fromBlock: 0, toBlock: 'latest' });
+      // event.watch((err, res) => {
+      //   if (err)
+      //   console.log('watch error', err)
+      //   else
+      //   console.log('got an event', res)
+      //});
+      console.log(propertyContract);
+    }
+    PropertyInit().then(console.log("Init property"))
+
+    async function PropertyRegistryInit() {
+      const json = await fetch('./contracts/PropertyRegistry.json').then((res) => {return res.json()});
+      propertyRegistryContract = await getContract(json);
+      console.log(propertyRegistryContract);
+    }
+    PropertyRegistryInit().then(console.log("Init propertyRegistry"))
+
+    async function PropertyTokenInit() {
+      const json = await fetch('./contracts/PropertyToken.json').then((res) => {return res.json()});
+      propertyTokenContract = await getContract(json);
+      console.log(propertyTokenContract);
+    }
+    PropertyTokenInit().then(console.log("Init propertyToken"))
+
+
+    const { accounts } = web3.eth;
+    const alice = accounts[0];
+    const bob = accounts[1];
+
+    async function createProperty() {
+      const form = document.getElementById("fCreateProp");
+      const URI  = form[0].value;
+      try {
+        const tx = await propertyContract.createProperty({
+          from: alice,
+          gas: 250000
+        });
+        console.log(tx);
+        await propertyContract.setURI(1,URI, {
+          from: alice,
+          gas: 250000
+        });
+        console.log('Property Created for Alice');
+        const uriValue = await propertyContract.getURI(1, {
+          from: alice,
+          gas: 250000
+        });
+        document.getElementById("createPropertyFlag").innerHTML = "Property Created by Alice:"+uriValue; console.log(uriValue);
+      } catch(e) {
+        console.log(e);
+        alert('Error creating property', e)
+      }
+    }
+
+    async function registerProperty() {
+
+      try {
+        const {tx, logs, receipt } = await propertyRegistryContract.registerProperty(1,100,{
+          from: alice,
+          gas: 250000
+        });
+        console.log(tx);
+        const regFlag = logs[0].event;
+        if(regFlag === "Registered")
+        {
+            document.getElementById("registerFlag").innerHTML = "Alice's Property Registered";
+        }else {
+          document.getElementById("registerFlag").innerHTML = "Unable to Register Property";
+        }
+
+      } catch(e) {
+        console.log(e);
+        alert('Error creating property', e)
+      }
+    }
+
+    async function requestProperty() {
+      const form = document.getElementById("fRequestBooking");
+      checkin  = new Date(form[0].value)/1000;
+      checkout  = new Date(form[1].value)/1000;
+      console.log(checkin);
+      console.log(checkout);
+      try {
+        const {tx, logs, receipt } = await propertyRegistryContract.request(1,checkin, checkin,{
+          from: bob,
+          gas: 250000
+        });
+        console.log(tx);
+        const regFlag = logs[0].event;
+        if(regFlag === "Requested")
+        {
+            document.getElementById("requestFlag").innerHTML = "Property Requested by Bob";
+        }else {
+          document.getElementById("requestFlag").innerHTML = "Unable to Request Property";
+        }
+
+      } catch(e) {
+        console.log(e);
+        alert('Error creating property', e)
+      }
+    }
+
+    async function approveBooking() {
+
+      try {
+        const {tx, logs, receipt } = await propertyRegistryContract.approveRequest(1,{
+          from: alice,
+          gas: 250000
+        });
+        console.log(tx);
+        const regFlag = logs[0].event;
+        if(regFlag === "Approved")
+        {
+            document.getElementById("approveBookingFlag").innerHTML = "Booking requested by Bob approved";
+        }else {
+          document.getElementById("approveBookingFlag").innerHTML = "Unable to approve booking";
+        }
+
+      } catch(e) {
+        console.log(e);
+        alert('Error creating property', e)
+      }
+    }
+
+    async function CheckIN() {
+      try {
+        const {tx, logs, receipt } = await propertyRegistryContract.checkIn(1,{
+          from: bob,
+          gas: 250000
+        });
+        console.log(tx);
+        const regFlag = logs[0].event;
+        if(regFlag === "CheckIn")
+        {
+            document.getElementById("CheckINFlag").innerHTML = "CheckIN done by Bob";
+        }else {
+          document.getElementById("CheckINFlag").innerHTML = "Unable to checkin";
+        }
+
+      } catch(e) {
+        console.log(e);
+        alert('Error creating property', e)
+      }
+    }
+
+    async function CheckOUT() {
+      console.log("Hi");
+      try {
+        const {tx, logs, receipt } = await propertyRegistryContract.checkOut(1,{
+          from: bob,
+          gas: 250000
+        });
+        console.log("Hi");
+        console.log(tx);
+        const regFlag = logs[0].event;
+        if(regFlag === "CheckOut")
+        {
+            document.getElementById("CheckOUTFlag").innerHTML = "CheckOUT done by Bob";
+        }else {
+          document.getElementById("CheckOUTFlag").innerHTML = "Unable to checkout";
+        }
+
+      } catch(e) {
+        console.log(e);
+        alert('Error creating property', e)
+      }
+    }
+
+  </script>
+</head>
+
+<body>
+  <h1>Bed-n-Blockchain</h1>
+  <!-- Tab links -->
+  <div class="tab">
+    <button class="tablinks" onclick="actionProperty(event, 'CreateProperty')">Create Property</button>
+    <button class="tablinks" onclick="actionProperty(event, 'RegisterProperty')">Register Property</button>
+    <button class="tablinks" onclick="actionProperty(event, 'RequestBooking')">Request Booking</button>
+    <button class="tablinks" onclick="actionProperty(event, 'ApproveBooking')">Approve Booking</button>
+    <button class="tablinks" onclick="actionProperty(event, 'CheckIN')">Check-In</button>
+    <button class="tablinks" onclick="actionProperty(event, 'CheckOUT')">Check-Out</button>
+  </div>
+
+  <!-- Tab content -->
+  <div id="CreateProperty" class="tabcontent">
+    <form id="fCreateProp">
+      URI <input type="text" name="URI">
+      <button type="button"  onclick="createProperty()"> Create Property </button>
+    </form>
+    <p id="createPropertyFlag"></p>
+  </div>
+
+  <div id="RegisterProperty" class="tabcontent">
+    <button type="button"  onclick="registerProperty()"> Register Property </button>
+    <p id="registerFlag"></p>
+  </div>
+
+  <div id="RequestBooking" class="tabcontent">
+    <form id="fRequestBooking">
+      Check-IN <input type="date" name="checkin" value="YYYYMMDD">
+      Check-OUT <input type="date" name="checkout" value="YYYYMMDD">
+      <button type="button"  onclick="requestProperty()"> Request Property </button>
+    </form>
+    <p id="requestFlag"></p>
+  </div>
+
+  <div id="ApproveBooking" class="tabcontent">
+    <button type="button"  onclick="approveBooking()"> Approve Booking </button>
+    <p id="approveBookingFlag"></p>
+  </div>
+
+  <div id="CheckIN" class="tabcontent">
+    <button type="button"  onclick="CheckIN()"> Check-IN </button>
+    <p id="CheckINFlag"></p>
+  </div>
+
+  <div id="CheckOUT" class="tabcontent">
+    <button type="button"  onclick="CheckOUT()"> Check-OUT </button>
+    <p id="CheckOUTFlag"></p>
+  </div>
+</body>
+
+</html>
